@@ -227,6 +227,29 @@ function OrganizationService.getMembership(characterId, orgId)
     }
 end
 
+--- Roster of every character currently a member of an organization. Unlike
+--- getMembership/getMemberships (per-character lookups), this is a
+--- per-org listing, added for consumers like oblsk_mdt's staff roster that
+--- need "who's in this org" rather than "what orgs is this character in".
+--- @param orgId number
+--- @return table[] one entry per member: { character_id, name, rank }
+function OrganizationService.listMembers(orgId)
+    local memberships = OrganizationMembership:where('organization_id', orgId):getSync()
+
+    local members = {}
+    for _, membership in ipairs(memberships) do
+        local character = Character:findSync(membership.character_id)
+        local rank = membership.rank_id and Rank:where('id', membership.rank_id):firstSync()
+
+        table.insert(members, {
+            character_id = membership.character_id,
+            name = character and (character:get('first_name') .. ' ' .. character:get('last_name')) or nil,
+            rank = rank and rank.name or nil,
+        })
+    end
+    return members
+end
+
 --- @param characterId number
 --- @return table[] one entry per org the character belongs to, same shape as getMembership's non-nil return
 function OrganizationService.getMemberships(characterId)

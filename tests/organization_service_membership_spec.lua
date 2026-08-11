@@ -19,6 +19,7 @@ dofile(scriptDir .. '../server/models/Department.lua')
 dofile(scriptDir .. '../server/models/Rank.lua')
 dofile(scriptDir .. '../server/models/Organization.lua')
 dofile(scriptDir .. '../server/models/OrganizationMembership.lua')
+dofile(CORE_ROOT .. '/modules/oblsk_characters/server/models/Character.lua')
 dofile(scriptDir .. '../server/services/OrganizationService.lua')
 
 local makeFakeQueryBuilderModule = dofile(scriptDir .. 'support/fake_query_builder.lua')
@@ -248,6 +249,42 @@ test('getMembership: returns nil for an org the character never joined', functio
     withFakeDb(function()
         local orgId = OrganizationService.create('LSPD')
         eq(OrganizationService.getMembership(1, orgId), nil)
+    end)
+end)
+
+test('listMembers: returns one entry per member with name and rank', function()
+    withFakeDb(function(tables)
+        local orgId = OrganizationService.create('LSPD')
+        local rankId = OrganizationService.addRank(orgId, 'Sergeant', 3)
+
+        local characterId = QueryBuilder.new('characters'):insert({ first_name = 'John', last_name = 'Doe' })
+        OrganizationService.join(characterId, orgId, rankId)
+
+        local members = OrganizationService.listMembers(orgId)
+        eq(#members, 1)
+        eq(members[1].character_id, characterId)
+        eq(members[1].name, 'John Doe')
+        eq(members[1].rank, 'Sergeant')
+    end)
+end)
+
+test('listMembers: rank is nil for a member with no rank assigned', function()
+    withFakeDb(function(tables)
+        local orgId = OrganizationService.create('LSPD')
+
+        local characterId = QueryBuilder.new('characters'):insert({ first_name = 'Jane', last_name = 'Roe' })
+        OrganizationService.join(characterId, orgId, nil)
+
+        local members = OrganizationService.listMembers(orgId)
+        eq(#members, 1)
+        eq(members[1].rank, nil)
+    end)
+end)
+
+test('listMembers: returns an empty table for an org with no members', function()
+    withFakeDb(function()
+        local orgId = OrganizationService.create('LSPD')
+        eq(#OrganizationService.listMembers(orgId), 0)
     end)
 end)
 

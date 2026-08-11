@@ -80,7 +80,7 @@ end
 --- until OrganizationService.setRank (Task 8) gives them a new one.
 --- @param rankId number
 function OrganizationService.removeRank(rankId)
-    QueryBuilder.new('organization_memberships'):where('rank_id', rankId):update({ rank_id = nil })
+    QueryBuilder.new('organization_memberships'):where('rank_id', rankId):update({ rank_id = Database.NULL })
     QueryBuilder.new('ranks'):where('id', rankId):delete()
 end
 

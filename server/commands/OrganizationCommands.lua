@@ -125,8 +125,11 @@ RegisterCommand('org-leave', function(source, args)
         return
     end
 
-    OrganizationService.leave(characterId, orgId)
-    print('[oblsk_organizations] character ' .. characterId .. ' left org #' .. orgId)
+    if OrganizationService.leave(characterId, orgId) then
+        print('[oblsk_organizations] character ' .. characterId .. ' left org #' .. orgId)
+    else
+        print('[oblsk_organizations] character ' .. characterId .. ' has no membership in org #' .. orgId)
+    end
 end, false)
 
 RegisterCommand('org-setrank', function(source, args)
@@ -146,8 +149,11 @@ RegisterCommand('org-setrank', function(source, args)
         return
     end
 
-    OrganizationService.setRank(characterId, orgId, rankId)
-    print('[oblsk_organizations] set character ' .. characterId .. '\'s rank in org #' .. orgId .. ' to #' .. rankId)
+    if OrganizationService.setRank(characterId, orgId, rankId) then
+        print('[oblsk_organizations] set character ' .. characterId .. '\'s rank in org #' .. orgId .. ' to #' .. rankId)
+    else
+        print('[oblsk_organizations] character ' .. characterId .. ' has no membership in org #' .. orgId)
+    end
 end, false)
 
 RegisterCommand('org-adddeptmember', function(source, args)
@@ -167,8 +173,11 @@ RegisterCommand('org-adddeptmember', function(source, args)
         return
     end
 
-    OrganizationService.joinDepartment(characterId, orgId, deptId)
-    print('[oblsk_organizations] added character ' .. characterId .. ' to department #' .. deptId)
+    if OrganizationService.joinDepartment(characterId, orgId, deptId) then
+        print('[oblsk_organizations] added character ' .. characterId .. ' to department #' .. deptId)
+    else
+        print('[oblsk_organizations] character ' .. characterId .. ' has no membership in org #' .. orgId)
+    end
 end, false)
 
 RegisterCommand('org-removedeptmember', function(source, args)
@@ -188,8 +197,11 @@ RegisterCommand('org-removedeptmember', function(source, args)
         return
     end
 
-    OrganizationService.leaveDepartment(characterId, orgId, deptId)
-    print('[oblsk_organizations] removed character ' .. characterId .. ' from department #' .. deptId)
+    if OrganizationService.leaveDepartment(characterId, orgId, deptId) then
+        print('[oblsk_organizations] removed character ' .. characterId .. ' from department #' .. deptId)
+    else
+        print('[oblsk_organizations] character ' .. characterId .. ' has no membership in org #' .. orgId)
+    end
 end, false)
 
 RegisterCommand('org-grant', function(source, args)

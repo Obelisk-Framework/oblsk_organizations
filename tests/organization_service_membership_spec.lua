@@ -87,7 +87,7 @@ test('join: with ALLOW_MULTIPLE_MEMBERSHIPS true, a character can hold two membe
     end)
 end)
 
-test('leave: removes the membership and its department-member rows', function()
+test('leave: removes the membership and its department-member rows, returns true', function()
     withFakeDb(function(tables)
         local orgId = OrganizationService.create('LSPD')
         local rankId = OrganizationService.addRank(orgId, 'Officer', 1)
@@ -96,52 +96,102 @@ test('leave: removes the membership and its department-member rows', function()
         OrganizationService.join(1, orgId, rankId)
         OrganizationService.joinDepartment(1, orgId, deptId)
 
-        OrganizationService.leave(1, orgId)
+        local result = OrganizationService.leave(1, orgId)
 
+        truthy(result, 'expected leave to return true on success')
         eq(#tables.organization_memberships, 0)
         eq(#tables.organization_department_members, 0)
     end)
 end)
 
-test('setRank: changes rank_id on the existing membership', function()
+test('leave: returns false and is a no-op if the character has no membership in that org', function()
+    withFakeDb(function()
+        local orgId = OrganizationService.create('LSPD')
+        eq(OrganizationService.leave(1, orgId), false)
+    end)
+end)
+
+test('setRank: changes rank_id on the existing membership, returns true', function()
     withFakeDb(function(tables)
         local orgId = OrganizationService.create('LSPD')
         local rankA = OrganizationService.addRank(orgId, 'Officer', 1)
         local rankB = OrganizationService.addRank(orgId, 'Sergeant', 3)
 
         OrganizationService.join(1, orgId, rankA)
-        OrganizationService.setRank(1, orgId, rankB)
+        local result = OrganizationService.setRank(1, orgId, rankB)
 
+        truthy(result, 'expected setRank to return true on success')
         eq(tables.organization_memberships[1].rank_id, rankB)
     end)
 end)
 
-test('joinDepartment: adds the character to a department within their org', function()
+test('setRank: returns false and is a no-op if the character has no membership in that org', function()
+    withFakeDb(function()
+        local orgId = OrganizationService.create('LSPD')
+        local rankId = OrganizationService.addRank(orgId, 'Officer', 1)
+
+        eq(OrganizationService.setRank(1, orgId, rankId), false)
+    end)
+end)
+
+test('setRank: returns false and is a no-op if the rank belongs to a different org', function()
+    withFakeDb(function(tables)
+        local orgA = OrganizationService.create('LSPD')
+        local orgB = OrganizationService.create('Ballas')
+        local rankA = OrganizationService.addRank(orgA, 'Officer', 1)
+        local foreignRank = OrganizationService.addRank(orgB, 'Shot Caller', 5)
+
+        OrganizationService.join(1, orgA, rankA)
+        local result = OrganizationService.setRank(1, orgA, foreignRank)
+
+        eq(result, false)
+        eq(tables.organization_memberships[1].rank_id, rankA)
+    end)
+end)
+
+test('joinDepartment: adds the character to a department within their org, returns true', function()
     withFakeDb(function(tables)
         local orgId = OrganizationService.create('LSPD')
         local rankId = OrganizationService.addRank(orgId, 'Officer', 1)
         local deptId = OrganizationService.addDepartment(orgId, 'SWAT')
 
         OrganizationService.join(1, orgId, rankId)
-        OrganizationService.joinDepartment(1, orgId, deptId)
+        local result = OrganizationService.joinDepartment(1, orgId, deptId)
 
+        truthy(result, 'expected joinDepartment to return true on success')
         eq(#tables.organization_department_members, 1)
         eq(tables.organization_department_members[1].department_id, deptId)
     end)
 end)
 
-test('joinDepartment: is a no-op if the character has no membership in that org', function()
+test('joinDepartment: is a no-op and returns false if the character has no membership in that org', function()
     withFakeDb(function(tables)
         local orgId = OrganizationService.create('LSPD')
         local deptId = OrganizationService.addDepartment(orgId, 'SWAT')
 
-        OrganizationService.joinDepartment(1, orgId, deptId)
+        local result = OrganizationService.joinDepartment(1, orgId, deptId)
 
+        eq(result, false)
         eq(#(tables.organization_department_members or {}), 0)
     end)
 end)
 
-test('leaveDepartment: removes just that department-member row', function()
+test('joinDepartment: is a no-op and returns false if the department belongs to a different org', function()
+    withFakeDb(function(tables)
+        local orgA = OrganizationService.create('LSPD')
+        local orgB = OrganizationService.create('Ballas')
+        local rankA = OrganizationService.addRank(orgA, 'Officer', 1)
+        local foreignDept = OrganizationService.addDepartment(orgB, 'Turf')
+
+        OrganizationService.join(1, orgA, rankA)
+        local result = OrganizationService.joinDepartment(1, orgA, foreignDept)
+
+        eq(result, false)
+        eq(#(tables.organization_department_members or {}), 0)
+    end)
+end)
+
+test('leaveDepartment: removes just that department-member row, returns true', function()
     withFakeDb(function(tables)
         local orgId = OrganizationService.create('LSPD')
         local rankId = OrganizationService.addRank(orgId, 'Officer', 1)
@@ -152,10 +202,20 @@ test('leaveDepartment: removes just that department-member row', function()
         OrganizationService.joinDepartment(1, orgId, dept1)
         OrganizationService.joinDepartment(1, orgId, dept2)
 
-        OrganizationService.leaveDepartment(1, orgId, dept1)
+        local result = OrganizationService.leaveDepartment(1, orgId, dept1)
 
+        truthy(result, 'expected leaveDepartment to return true on success')
         eq(#tables.organization_department_members, 1)
         eq(tables.organization_department_members[1].department_id, dept2)
+    end)
+end)
+
+test('leaveDepartment: returns false and is a no-op if the character has no membership in that org', function()
+    withFakeDb(function()
+        local orgId = OrganizationService.create('LSPD')
+        local deptId = OrganizationService.addDepartment(orgId, 'SWAT')
+
+        eq(OrganizationService.leaveDepartment(1, orgId, deptId), false)
     end)
 end)
 

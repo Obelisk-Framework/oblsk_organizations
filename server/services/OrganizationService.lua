@@ -28,14 +28,26 @@ function OrganizationService.rename(orgId, name)
 end
 
 --- Cascades: removes this organization's departments, ranks, memberships,
---- and department-member rows, so nothing is left pointing at a deleted
---- organization_id.
+--- department-member rows, and every permission grant made to one of its
+--- departments/ranks, so nothing is left pointing at a deleted
+--- organization_id and no grant becomes an orphaned row.
 --- @param orgId number
 function OrganizationService.delete(orgId)
     local memberships = QueryBuilder.new('organization_memberships'):where('organization_id', orgId):getSync()
     for _, membership in ipairs(memberships) do
         QueryBuilder.new('organization_department_members'):where('membership_id', membership.id):delete()
     end
+
+    local departments = QueryBuilder.new('departments'):where('organization_id', orgId):getSync()
+    for _, department in ipairs(departments) do
+        PermissionService.revokeAll('department', department.id)
+    end
+
+    local ranks = QueryBuilder.new('ranks'):where('organization_id', orgId):getSync()
+    for _, rank in ipairs(ranks) do
+        PermissionService.revokeAll('rank', rank.id)
+    end
+
     QueryBuilder.new('organization_memberships'):where('organization_id', orgId):delete()
     QueryBuilder.new('departments'):where('organization_id', orgId):delete()
     QueryBuilder.new('ranks'):where('organization_id', orgId):delete()
@@ -54,10 +66,12 @@ function OrganizationService.addDepartment(orgId, name)
     })
 end
 
---- Cascades: removes this department's department-member rows.
+--- Cascades: removes this department's department-member rows and every
+--- permission grant made to it.
 --- @param deptId number
 function OrganizationService.removeDepartment(deptId)
     QueryBuilder.new('organization_department_members'):where('department_id', deptId):delete()
+    PermissionService.revokeAll('department', deptId)
     QueryBuilder.new('departments'):where('id', deptId):delete()
 end
 
@@ -78,9 +92,14 @@ end
 --- Does not kick anyone from the organization: any membership that held
 --- this rank has its rank_id set to nil instead, they simply have no rank
 --- until OrganizationService.setRank (Task 8) gives them a new one.
+--- Also revokes every permission grant made to this rank.
 --- @param rankId number
 function OrganizationService.removeRank(rankId)
-    QueryBuilder.new('organization_memberships'):where('rank_id', rankId):update({ rank_id = Database.NULL })
+    QueryBuilder.new('organization_memberships'):where('rank_id', rankId):update({
+        rank_id = Database.NULL,
+        updated_at = Database.now(),
+    })
+    PermissionService.revokeAll('rank', rankId)
     QueryBuilder.new('ranks'):where('id', rankId):delete()
 end
 
@@ -107,43 +126,66 @@ end
 --- Cascades: removes this membership's department-member rows.
 --- @param characterId number
 --- @param orgId number
+--- @return boolean true if a membership existed and was removed, false if it was a no-op
 function OrganizationService.leave(characterId, orgId)
     local membership = QueryBuilder.new('organization_memberships')
         :where('character_id', characterId):where('organization_id', orgId):firstSync()
     if not membership then
-        return
+        return false
     end
 
     QueryBuilder.new('organization_department_members'):where('membership_id', membership.id):delete()
     QueryBuilder.new('organization_memberships'):where('id', membership.id):delete()
+    return true
 end
 
---- No-op if the character has no membership in this org.
+--- No-op if the character has no membership in this org, or if rankId
+--- doesn't belong to orgId.
 --- @param characterId number
 --- @param orgId number
 --- @param rankId number
+--- @return boolean true on success, false if it was a no-op
 function OrganizationService.setRank(characterId, orgId, rankId)
-    QueryBuilder.new('organization_memberships')
-        :where('character_id', characterId):where('organization_id', orgId)
-        :update({ rank_id = rankId, updated_at = Database.now() })
-end
+    local rank = QueryBuilder.new('ranks'):where('id', rankId):where('organization_id', orgId):firstSync()
+    if not rank then
+        return false
+    end
 
---- No-op if the character has no membership in this org (joining a
---- department without an existing membership is not an implicit join).
---- @param characterId number
---- @param orgId number
---- @param deptId number
-function OrganizationService.joinDepartment(characterId, orgId, deptId)
     local membership = QueryBuilder.new('organization_memberships')
         :where('character_id', characterId):where('organization_id', orgId):firstSync()
     if not membership then
-        return
+        return false
+    end
+
+    QueryBuilder.new('organization_memberships')
+        :where('character_id', characterId):where('organization_id', orgId)
+        :update({ rank_id = rankId, updated_at = Database.now() })
+    return true
+end
+
+--- No-op if the character has no membership in this org (joining a
+--- department without an existing membership is not an implicit join),
+--- or if deptId doesn't belong to orgId.
+--- @param characterId number
+--- @param orgId number
+--- @param deptId number
+--- @return boolean true on success, false if it was a no-op
+function OrganizationService.joinDepartment(characterId, orgId, deptId)
+    local department = QueryBuilder.new('departments'):where('id', deptId):where('organization_id', orgId):firstSync()
+    if not department then
+        return false
+    end
+
+    local membership = QueryBuilder.new('organization_memberships')
+        :where('character_id', characterId):where('organization_id', orgId):firstSync()
+    if not membership then
+        return false
     end
 
     local existing = QueryBuilder.new('organization_department_members')
         :where('membership_id', membership.id):where('department_id', deptId):firstSync()
     if existing then
-        return
+        return false
     end
 
     QueryBuilder.new('organization_department_members'):insert({
@@ -152,20 +194,23 @@ function OrganizationService.joinDepartment(characterId, orgId, deptId)
         created_at = Database.now(),
         updated_at = Database.now(),
     })
+    return true
 end
 
 --- @param characterId number
 --- @param orgId number
 --- @param deptId number
+--- @return boolean true if a department-member row existed and was removed, false if it was a no-op
 function OrganizationService.leaveDepartment(characterId, orgId, deptId)
     local membership = QueryBuilder.new('organization_memberships')
         :where('character_id', characterId):where('organization_id', orgId):firstSync()
     if not membership then
-        return
+        return false
     end
 
     QueryBuilder.new('organization_department_members')
         :where('membership_id', membership.id):where('department_id', deptId):delete()
+    return true
 end
 
 --- @param characterId number

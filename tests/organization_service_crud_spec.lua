@@ -11,6 +11,7 @@ dofile(CORE_ROOT .. '/core/server/ORM/Dialects/MySQL.lua')
 dofile(CORE_ROOT .. '/core/server/ORM/Dialects/Postgres.lua')
 dofile(CORE_ROOT .. '/core/server/ORM/Database.lua')
 dofile(CORE_ROOT .. '/core/server/ORM/QueryBuilder.lua')
+dofile(CORE_ROOT .. '/core/server/Services/PermissionService.lua')
 dofile(scriptDir .. '../server/services/OrganizationService.lua')
 
 local makeFakeQueryBuilderModule = dofile(scriptDir .. 'support/fake_query_builder.lua')
@@ -29,6 +30,9 @@ local function withFakeDb(fn)
     local tables = {}
     local original = QueryBuilder
     QueryBuilder = makeFakeQueryBuilderModule(tables)
+
+    PermissionService.registerType('rank', {})
+    PermissionService.registerType('department', {})
 
     local ok, err = pcall(fn, tables)
 
@@ -72,6 +76,27 @@ test('delete: removes the organization and its departments/ranks/memberships', f
     end)
 end)
 
+test('delete: revokes every permission granted to any department/rank that belonged to it', function()
+    withFakeDb(function()
+        local orgId = OrganizationService.create('LSPD')
+        local deptId = OrganizationService.addDepartment(orgId, 'SWAT')
+        local rankId = OrganizationService.addRank(orgId, 'Sergeant', 3)
+
+        PermissionService.grant('department', deptId, 'manage_fleet')
+        PermissionService.grant('rank', rankId, 'manage_bank')
+
+        local otherOrgId = OrganizationService.create('Ballas')
+        local otherRankId = OrganizationService.addRank(otherOrgId, 'Shot Caller', 5)
+        PermissionService.grant('rank', otherRankId, 'manage_bank')
+
+        OrganizationService.delete(orgId)
+
+        eq(#PermissionService.list('department', deptId), 0)
+        eq(#PermissionService.list('rank', rankId), 0)
+        eq(#PermissionService.list('rank', otherRankId), 1)
+    end)
+end)
+
 test('addDepartment: inserts a department scoped to the organization', function()
     withFakeDb(function(tables)
         local orgId = OrganizationService.create('LSPD')
@@ -97,6 +122,22 @@ test('removeDepartment: removes the department and its department-member rows', 
 
         eq(#tables.departments, 0)
         eq(#tables.organization_department_members, 0)
+    end)
+end)
+
+test('removeDepartment: also revokes every permission granted to that department', function()
+    withFakeDb(function(tables)
+        local orgId = OrganizationService.create('LSPD')
+        local deptId = OrganizationService.addDepartment(orgId, 'SWAT')
+        local otherDeptId = OrganizationService.addDepartment(orgId, 'Patrol')
+
+        PermissionService.grant('department', deptId, 'manage_fleet')
+        PermissionService.grant('department', otherDeptId, 'manage_fleet')
+
+        OrganizationService.removeDepartment(deptId)
+
+        eq(#PermissionService.list('department', deptId), 0)
+        eq(#PermissionService.list('department', otherDeptId), 1)
     end)
 end)
 
@@ -127,6 +168,38 @@ test('removeRank: removes the rank and nils out rank_id on any membership that h
         eq(#tables.ranks, 0)
         local membership = QueryBuilder.new('organization_memberships'):where('id', membershipId):firstSync()
         eq(membership.rank_id, nil)
+    end)
+end)
+
+test('removeRank: bumps updated_at on any membership that held it', function()
+    withFakeDb(function()
+        local orgId = OrganizationService.create('LSPD')
+        local rankId = OrganizationService.addRank(orgId, 'Sergeant', 3)
+        local membershipId = QueryBuilder.new('organization_memberships'):insert({
+            character_id = 1, organization_id = orgId, rank_id = rankId,
+            created_at = Database.now(), updated_at = nil,
+        })
+
+        OrganizationService.removeRank(rankId)
+
+        local membership = QueryBuilder.new('organization_memberships'):where('id', membershipId):firstSync()
+        eq(membership.updated_at, Database.now())
+    end)
+end)
+
+test('removeRank: also revokes every permission granted to that rank', function()
+    withFakeDb(function()
+        local orgId = OrganizationService.create('LSPD')
+        local rankId = OrganizationService.addRank(orgId, 'Sergeant', 3)
+        local otherRankId = OrganizationService.addRank(orgId, 'Officer', 1)
+
+        PermissionService.grant('rank', rankId, 'manage_bank')
+        PermissionService.grant('rank', otherRankId, 'manage_bank')
+
+        OrganizationService.removeRank(rankId)
+
+        eq(#PermissionService.list('rank', rankId), 0)
+        eq(#PermissionService.list('rank', otherRankId), 1)
     end)
 end)
 

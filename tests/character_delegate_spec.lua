@@ -11,15 +11,19 @@ dofile(CORE_ROOT .. '/core/server/ORM/Dialects/MySQL.lua')
 dofile(CORE_ROOT .. '/core/server/ORM/Dialects/Postgres.lua')
 dofile(CORE_ROOT .. '/core/server/ORM/Database.lua')
 dofile(CORE_ROOT .. '/core/server/ORM/QueryBuilder.lua')
+dofile(CORE_ROOT .. '/core/server/ORM/Schema.lua')
+dofile(CORE_ROOT .. '/core/server/ORM/BaseModel.lua')
 dofile(CORE_ROOT .. '/core/server/Services/PermissionService.lua')
+dofile(CORE_ROOT .. '/core/server/Traits/HasPermissions.lua')
+dofile(scriptDir .. '../server/models/Department.lua')
+dofile(scriptDir .. '../server/models/Rank.lua')
+dofile(scriptDir .. '../server/models/Organization.lua')
+dofile(scriptDir .. '../server/models/OrganizationMembership.lua')
 dofile(scriptDir .. '../server/services/OrganizationService.lua')
 
--- registerType('rank'/'department', ...) is normally done by HasPermissions
--- via the real Department/Rank models (Task 6); this test only needs the
--- delegate wiring from main.lua, so it registers the two types directly
--- rather than loading BaseModel/Schema/the real model files too.
-PermissionService.registerType('rank', {})
-PermissionService.registerType('department', {})
+-- 'character' has no model in this repo (oblsk_characters owns that one),
+-- so it's registered directly; 'rank'/'department' are already registered
+-- by Rank.lua/Department.lua's own HasPermissions.apply calls above.
 PermissionService.registerType('character', {})
 
 dofile(scriptDir .. '../server/main.lua')

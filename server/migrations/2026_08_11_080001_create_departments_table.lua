@@ -6,8 +6,8 @@ return {
     up = function()
         Schema.create('departments', function(table)
             table:id()
-            table:integer('organization_id'):notNullable()
-            table:string('name'):notNullable()
+            table:integer('organization_id')
+            table:string('name')
             table:timestamps()
 
             table:index({'organization_id'})

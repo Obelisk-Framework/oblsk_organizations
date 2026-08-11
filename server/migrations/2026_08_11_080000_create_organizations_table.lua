@@ -3,7 +3,7 @@ return {
     up = function()
         Schema.create('organizations', function(table)
             table:id()
-            table:string('name'):notNullable()
+            table:string('name')
             table:timestamps()
         end)
 

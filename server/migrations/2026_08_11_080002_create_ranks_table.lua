@@ -7,9 +7,9 @@ return {
     up = function()
         Schema.create('ranks', function(table)
             table:id()
-            table:integer('organization_id'):notNullable()
-            table:string('name'):notNullable()
-            table:integer('grade'):notNullable():default(0)
+            table:integer('organization_id')
+            table:string('name')
+            table:integer('grade'):default(0)
             table:timestamps()
 
             table:index({'organization_id'})

@@ -31,7 +31,7 @@ function OrganizationService.rename(orgId, name)
 end
 
 --- Cascades: removes this organization's departments, ranks, memberships,
---- department-member rows, and every permission grant made to one of its
+--- department-member rows, contact numbers, and every permission grant made to one of its
 --- departments/ranks, so nothing is left pointing at a deleted
 --- organization_id and no grant becomes an orphaned row.
 --- @param orgId number
@@ -54,6 +54,7 @@ function OrganizationService.delete(orgId)
     OrganizationMembership:where('organization_id', orgId):delete()
     Department:where('organization_id', orgId):delete()
     Rank:where('organization_id', orgId):delete()
+    QueryBuilder.new('organization_contact_numbers'):where('organization_id', orgId):delete()
     Organization:where('id', orgId):delete()
 end
 
@@ -285,6 +286,35 @@ function OrganizationService.setDetails(orgId, details)
         updated_at = Database.now(),
     })
     return true
+end
+
+--- @param orgId number
+--- @param number string
+--- @param label string
+--- @return number contactId
+function OrganizationService.addContactNumber(orgId, number, label)
+    return QueryBuilder.new('organization_contact_numbers'):insert({
+        organization_id = orgId,
+        number = number,
+        label = label,
+        enabled = true,
+        created_at = Database.now(),
+        updated_at = Database.now(),
+    })
+end
+
+--- @param contactId number
+function OrganizationService.removeContactNumber(contactId)
+    QueryBuilder.new('organization_contact_numbers'):where('id', contactId):delete()
+end
+
+--- @param contactId number
+--- @param enabled boolean
+function OrganizationService.toggleContactNumber(contactId, enabled)
+    QueryBuilder.new('organization_contact_numbers'):where('id', contactId):update({
+        enabled = enabled,
+        updated_at = Database.now(),
+    })
 end
 
 --- Every organization with its departments, ranks (grade-ordered, lowest

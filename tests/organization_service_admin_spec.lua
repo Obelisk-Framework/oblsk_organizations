@@ -112,6 +112,53 @@ test('list: returns organizations with departments, ranks (grade-ordered) and co
     end)
 end)
 
+test('addContactNumber: inserts a contact number scoped to the organization', function()
+    withFakeDb(function(tables)
+        local orgId = OrganizationService.create('LSPD')
+        local contactId = OrganizationService.addContactNumber(orgId, '911', 'Emergency')
+
+        eq(#tables.organization_contact_numbers, 1)
+        eq(tables.organization_contact_numbers[1].id, contactId)
+        eq(tables.organization_contact_numbers[1].organization_id, orgId)
+        eq(tables.organization_contact_numbers[1].number, '911')
+        eq(tables.organization_contact_numbers[1].label, 'Emergency')
+        eq(tables.organization_contact_numbers[1].enabled, true)
+    end)
+end)
+
+test('removeContactNumber: removes the contact number', function()
+    withFakeDb(function(tables)
+        local orgId = OrganizationService.create('LSPD')
+        local contactId = OrganizationService.addContactNumber(orgId, '911', 'Emergency')
+
+        OrganizationService.removeContactNumber(contactId)
+
+        eq(#tables.organization_contact_numbers, 0)
+    end)
+end)
+
+test('toggleContactNumber: flips enabled', function()
+    withFakeDb(function(tables)
+        local orgId = OrganizationService.create('LSPD')
+        local contactId = OrganizationService.addContactNumber(orgId, '911', 'Emergency')
+
+        OrganizationService.toggleContactNumber(contactId, false)
+
+        eq(tables.organization_contact_numbers[1].enabled, false)
+    end)
+end)
+
+test("delete: also removes the organization's contact numbers", function()
+    withFakeDb(function(tables)
+        local orgId = OrganizationService.create('LSPD')
+        OrganizationService.addContactNumber(orgId, '911', 'Emergency')
+
+        OrganizationService.delete(orgId)
+
+        eq(#tables.organization_contact_numbers, 0)
+    end)
+end)
+
 print('Running OrganizationService admin unit tests\n')
 for _, t in ipairs(tests) do
     local ok, err = pcall(t.fn)

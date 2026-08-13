@@ -1,7 +1,9 @@
--- Unit tests for OrganizationService: organization/department/rank CRUD.
--- Membership and department-membership behavior is covered in
--- organization_service_membership_spec.lua (Task 8).
--- Run from the repository root:  lua5.4 tests/organization_service_admin_spec.lua
+-- Unit tests for OrganizationService: admin-facing setDetails validation,
+-- list output shape, and contact-number CRUD/toggle behavior. Organization/
+-- department/rank CRUD is covered in organization_service_crud_spec.lua;
+-- membership and department-membership behavior is covered in
+-- organization_service_membership_spec.lua.
+-- Run from the repository root:  lua5.4 modules/oblsk_organizations/tests/organization_service_admin_spec.lua
 local scriptDir = arg[0]:match('(.*/)') or './'
 local CORE_ROOT = scriptDir .. '../../..'
 

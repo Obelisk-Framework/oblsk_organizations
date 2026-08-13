@@ -262,4 +262,55 @@ function OrganizationService.getMemberships(characterId)
     return memberships
 end
 
+--- @param orgId number
+--- @param details table { shortCode, colour, type }
+--- @return boolean ok
+--- @return string|nil reason present only when ok is false
+function OrganizationService.setDetails(orgId, details)
+    if details.type ~= 'Government' and details.type ~= 'Business' then
+        return false, 'type must be Government or Business'
+    end
+
+    if details.shortCode and details.shortCode ~= '' then
+        local existing = Organization:where('short_code', details.shortCode):firstSync()
+        if existing and existing.id ~= orgId then
+            return false, 'short code already in use'
+        end
+    end
+
+    Organization:where('id', orgId):update({
+        short_code = details.shortCode,
+        colour = details.colour,
+        type = details.type,
+        updated_at = Database.now(),
+    })
+    return true
+end
+
+--- Every organization with its departments, ranks (grade-ordered, lowest
+--- first) and contact numbers eager-loaded, for the admin panel's org list.
+--- @return table[]
+function OrganizationService.list()
+    local orgs = QueryBuilder.new('organizations'):getSync()
+
+    local result = {}
+    for _, org in ipairs(orgs) do
+        local departments = Department:where('organization_id', org.id):getSync()
+        local ranks = Rank:where('organization_id', org.id):orderBy('grade', 'asc'):getSync()
+        local contactNumbers = QueryBuilder.new('organization_contact_numbers'):where('organization_id', org.id):getSync()
+
+        table.insert(result, {
+            id = org.id,
+            name = org.name,
+            short_code = org.short_code,
+            colour = org.colour,
+            type = org.type,
+            departments = departments,
+            ranks = ranks,
+            contact_numbers = contactNumbers,
+        })
+    end
+    return result
+end
+
 return OrganizationService

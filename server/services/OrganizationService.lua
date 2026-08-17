@@ -18,7 +18,7 @@ OrganizationService.ALLOW_MULTIPLE_MEMBERSHIPS = false
 --- @param name string
 --- @return number orgId
 function OrganizationService.create(name)
-    return Organization:createSync({ name = name }):get('id')
+    return Organization:create({ name = name }).id
 end
 
 --- @param orgId number
@@ -36,17 +36,17 @@ end
 --- organization_id and no grant becomes an orphaned row.
 --- @param orgId number
 function OrganizationService.delete(orgId)
-    local memberships = OrganizationMembership:where('organization_id', orgId):getSync()
+    local memberships = OrganizationMembership:where('organization_id', orgId):get()
     for _, membership in ipairs(memberships) do
         QueryBuilder.new('organization_department_members'):where('membership_id', membership.id):delete()
     end
 
-    local departments = Department:where('organization_id', orgId):getSync()
+    local departments = Department:where('organization_id', orgId):get()
     for _, department in ipairs(departments) do
         PermissionService.revokeAll('department', department.id)
     end
 
-    local ranks = Rank:where('organization_id', orgId):getSync()
+    local ranks = Rank:where('organization_id', orgId):get()
     for _, rank in ipairs(ranks) do
         PermissionService.revokeAll('rank', rank.id)
     end
@@ -62,7 +62,7 @@ end
 --- @param name string
 --- @return number deptId
 function OrganizationService.addDepartment(orgId, name)
-    return Department:createSync({ organization_id = orgId, name = name }):get('id')
+    return Department:create({ organization_id = orgId, name = name }).id
 end
 
 --- Cascades: removes this department's department-member rows and every
@@ -79,7 +79,7 @@ end
 --- @param grade number higher = more senior
 --- @return number rankId
 function OrganizationService.addRank(orgId, name, grade)
-    return Rank:createSync({ organization_id = orgId, name = name, grade = grade }):get('id')
+    return Rank:create({ organization_id = orgId, name = name, grade = grade }).id
 end
 
 --- Does not kick anyone from the organization: any membership that held
@@ -101,13 +101,13 @@ end
 --- @param rankId number
 function OrganizationService.join(characterId, orgId, rankId)
     if not OrganizationService.ALLOW_MULTIPLE_MEMBERSHIPS then
-        local existing = OrganizationMembership:where('character_id', characterId):getSync()
+        local existing = OrganizationMembership:where('character_id', characterId):get()
         for _, membership in ipairs(existing) do
             OrganizationService.leave(characterId, membership.organization_id)
         end
     end
 
-    OrganizationMembership:createSync({
+    OrganizationMembership:create({
         character_id = characterId,
         organization_id = orgId,
         rank_id = rankId,
@@ -120,7 +120,7 @@ end
 --- @return boolean true if a membership existed and was removed, false if it was a no-op
 function OrganizationService.leave(characterId, orgId)
     local membership = OrganizationMembership
-        :where('character_id', characterId):where('organization_id', orgId):firstSync()
+        :where('character_id', characterId):where('organization_id', orgId):first()
     if not membership then
         return false
     end
@@ -137,13 +137,13 @@ end
 --- @param rankId number
 --- @return boolean true on success, false if it was a no-op
 function OrganizationService.setRank(characterId, orgId, rankId)
-    local rank = Rank:where('id', rankId):where('organization_id', orgId):firstSync()
+    local rank = Rank:where('id', rankId):where('organization_id', orgId):first()
     if not rank then
         return false
     end
 
     local membership = OrganizationMembership
-        :where('character_id', characterId):where('organization_id', orgId):firstSync()
+        :where('character_id', characterId):where('organization_id', orgId):first()
     if not membership then
         return false
     end
@@ -162,19 +162,19 @@ end
 --- @param deptId number
 --- @return boolean true on success, false if it was a no-op
 function OrganizationService.joinDepartment(characterId, orgId, deptId)
-    local department = Department:where('id', deptId):where('organization_id', orgId):firstSync()
+    local department = Department:where('id', deptId):where('organization_id', orgId):first()
     if not department then
         return false
     end
 
     local membership = OrganizationMembership
-        :where('character_id', characterId):where('organization_id', orgId):firstSync()
+        :where('character_id', characterId):where('organization_id', orgId):first()
     if not membership then
         return false
     end
 
     local existing = QueryBuilder.new('organization_department_members')
-        :where('membership_id', membership.id):where('department_id', deptId):firstSync()
+        :where('membership_id', membership.id):where('department_id', deptId):first()
     if existing then
         return false
     end
@@ -194,7 +194,7 @@ end
 --- @return boolean true if a department-member row existed and was removed, false if it was a no-op
 function OrganizationService.leaveDepartment(characterId, orgId, deptId)
     local membership = OrganizationMembership
-        :where('character_id', characterId):where('organization_id', orgId):firstSync()
+        :where('character_id', characterId):where('organization_id', orgId):first()
     if not membership then
         return false
     end
@@ -209,13 +209,13 @@ end
 --- @return table|nil { organization_id, rank_id, department_ids } or nil if no membership
 function OrganizationService.getMembership(characterId, orgId)
     local membership = OrganizationMembership
-        :where('character_id', characterId):where('organization_id', orgId):firstSync()
+        :where('character_id', characterId):where('organization_id', orgId):first()
     if not membership then
         return nil
     end
 
     local deptRows = QueryBuilder.new('organization_department_members')
-        :where('membership_id', membership.id):getSync()
+        :where('membership_id', membership.id):get()
     local departmentIds = {}
     for _, row in ipairs(deptRows) do
         table.insert(departmentIds, row.department_id)
@@ -235,16 +235,16 @@ end
 --- @param orgId number
 --- @return table[] one entry per member: { character_id, name, rank }
 function OrganizationService.listMembers(orgId)
-    local memberships = OrganizationMembership:where('organization_id', orgId):getSync()
+    local memberships = OrganizationMembership:where('organization_id', orgId):get()
 
     local members = {}
     for _, membership in ipairs(memberships) do
-        local character = Character:findSync(membership.character_id)
-        local rank = membership.rank_id and Rank:where('id', membership.rank_id):firstSync()
+        local character = Character:find(membership.character_id)
+        local rank = membership.rank_id and Rank:where('id', membership.rank_id):first()
 
         table.insert(members, {
             character_id = membership.character_id,
-            name = character and (character:get('first_name') .. ' ' .. character:get('last_name')) or nil,
+            name = character and (character.first_name .. ' ' .. character.last_name) or nil,
             rank = rank and rank.name or nil,
         })
     end
@@ -254,7 +254,7 @@ end
 --- @param characterId number
 --- @return table[] one entry per org the character belongs to, same shape as getMembership's non-nil return
 function OrganizationService.getMemberships(characterId)
-    local rows = OrganizationMembership:where('character_id', characterId):getSync()
+    local rows = OrganizationMembership:where('character_id', characterId):get()
 
     local memberships = {}
     for _, row in ipairs(rows) do
@@ -273,7 +273,7 @@ function OrganizationService.setDetails(orgId, details)
     end
 
     if details.shortCode and details.shortCode ~= '' then
-        local existing = Organization:where('short_code', details.shortCode):firstSync()
+        local existing = Organization:where('short_code', details.shortCode):first()
         if existing and existing.id ~= orgId then
             return false, 'short code already in use'
         end
@@ -321,13 +321,13 @@ end
 --- first) and contact numbers eager-loaded, for the admin panel's org list.
 --- @return table[]
 function OrganizationService.list()
-    local orgs = QueryBuilder.new('organizations'):getSync()
+    local orgs = QueryBuilder.new('organizations'):get()
 
     local result = {}
     for _, org in ipairs(orgs) do
-        local departments = Department:where('organization_id', org.id):getSync()
-        local ranks = Rank:where('organization_id', org.id):orderBy('grade', 'asc'):getSync()
-        local contactNumbers = QueryBuilder.new('organization_contact_numbers'):where('organization_id', org.id):getSync()
+        local departments = Department:where('organization_id', org.id):get()
+        local ranks = Rank:where('organization_id', org.id):orderBy('grade', 'asc'):get()
+        local contactNumbers = QueryBuilder.new('organization_contact_numbers'):where('organization_id', org.id):get()
 
         table.insert(result, {
             id = org.id,

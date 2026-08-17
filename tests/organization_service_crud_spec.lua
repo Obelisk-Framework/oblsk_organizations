@@ -173,7 +173,7 @@ test('removeRank: removes the rank and nils out rank_id on any membership that h
         OrganizationService.removeRank(rankId)
 
         eq(#tables.ranks, 0)
-        local membership = QueryBuilder.new('organization_memberships'):where('id', membershipId):firstSync()
+        local membership = QueryBuilder.new('organization_memberships'):where('id', membershipId):first()
         eq(membership.rank_id, nil)
     end)
 end)
@@ -189,7 +189,7 @@ test('removeRank: bumps updated_at on any membership that held it', function()
 
         OrganizationService.removeRank(rankId)
 
-        local membership = QueryBuilder.new('organization_memberships'):where('id', membershipId):firstSync()
+        local membership = QueryBuilder.new('organization_memberships'):where('id', membershipId):first()
         eq(membership.updated_at, Database.now())
     end)
 end)

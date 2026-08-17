@@ -5,7 +5,7 @@
 --- Uses the Organization/Department/Rank/OrganizationMembership models via
 --- BaseModel's :where(...) query proxy wherever a model exists for the
 --- table (the framework's established convention, see e.g. VehicleService's
---- Vehicle:findSync/BaseVehicle:findSync). organization_department_members
+--- Vehicle:find/BaseVehicle:find). organization_department_members
 --- is a pure junction table with no independent identity beyond the two ids
 --- it links, so it stays raw QueryBuilder, same as vehicle_tunings.
 OrganizationService = {}
